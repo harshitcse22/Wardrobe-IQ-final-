@@ -1,9 +1,51 @@
+import { useState, useEffect } from 'react';
 import { Upload, Shirt, Sparkles, MapPin, TrendingUp, Calendar, Heart } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 
 const Dashboard = ({ user }) => {
   const navigate = useNavigate();
+  const [stats, setStats] = useState({
+    totalItems: 0,
+    outfitsCreated: 0,
+    tripsPlanned: 0,
+    favorites: 0
+  });
+
+  useEffect(() => {
+    fetchStats();
+  }, []);
+
+  const fetchStats = async () => {
+    try {
+      // Fetch wardrobe items
+      const wardrobeRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/wardrobe`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const wardrobeData = await wardrobeRes.json();
+      
+      // Fetch saved outfits
+      const outfitsRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/recommendations/outfits`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const outfitsData = await outfitsRes.json();
+      
+      // Fetch trips
+      const tripsRes = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/trips`, {
+        headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+      });
+      const tripsData = await tripsRes.json();
+      
+      setStats({
+        totalItems: wardrobeData.total || wardrobeData.items?.length || 0,
+        outfitsCreated: outfitsData.total || outfitsData.outfits?.length || 0,
+        tripsPlanned: tripsData.total || tripsData.tripPlans?.length || 0,
+        favorites: wardrobeData.items?.filter(item => item.isFavorite)?.length || 0
+      });
+    } catch (error) {
+      console.error('Failed to fetch stats:', error);
+    }
+  };
 
   const dashboardCards = [
     {
@@ -94,8 +136,7 @@ const Dashboard = ({ user }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Total Items</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">24</p>
-                <p className="text-sm text-emerald-600 font-medium mt-1">+3 this week</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.totalItems}</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-violet-500 to-purple-600 rounded-2xl flex items-center justify-center">
                 <Shirt size={24} className="text-white" />
@@ -107,8 +148,7 @@ const Dashboard = ({ user }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Outfits Created</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">12</p>
-                <p className="text-sm text-blue-600 font-medium mt-1">+2 today</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.outfitsCreated}</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center">
                 <Sparkles size={24} className="text-white" />
@@ -120,8 +160,7 @@ const Dashboard = ({ user }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Trips Planned</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">3</p>
-                <p className="text-sm text-orange-600 font-medium mt-1">1 upcoming</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.tripsPlanned}</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-orange-500 to-red-500 rounded-2xl flex items-center justify-center">
                 <MapPin size={24} className="text-white" />
@@ -133,8 +172,7 @@ const Dashboard = ({ user }) => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm font-medium text-gray-500 uppercase tracking-wide">Favorites</p>
-                <p className="text-3xl font-bold text-gray-900 mt-1">8</p>
-                <p className="text-sm text-pink-600 font-medium mt-1">Most loved</p>
+                <p className="text-3xl font-bold text-gray-900 mt-1">{stats.favorites}</p>
               </div>
               <div className="w-12 h-12 bg-gradient-to-r from-pink-500 to-rose-500 rounded-2xl flex items-center justify-center">
                 <Heart size={24} className="text-white" />

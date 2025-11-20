@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Filter, Edit, Trash2, Search } from 'lucide-react';
+import { Filter, Heart, Trash2, Search } from 'lucide-react';
 import Navbar from '../components/Navbar';
 
 const Wardrobe = () => {
@@ -44,6 +44,27 @@ const Wardrobe = () => {
       console.error('Failed to fetch wardrobe items:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const toggleFavorite = async (itemId, currentStatus) => {
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/wardrobe/${itemId}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${localStorage.getItem('token')}`
+        },
+        body: JSON.stringify({ isFavorite: !currentStatus })
+      });
+
+      if (response.ok) {
+        setItems(items.map(item => 
+          item._id === itemId ? { ...item, isFavorite: !currentStatus } : item
+        ));
+      }
+    } catch (error) {
+      console.error('Failed to toggle favorite:', error);
     }
   };
 
@@ -173,8 +194,14 @@ const Wardrobe = () => {
                   
                   <div className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity">
                     <div className="flex space-x-1">
-                      <button className="p-2 bg-white rounded-lg shadow-sm hover:bg-gray-50">
-                        <Edit size={16} className="text-gray-600" />
+                      <button 
+                        onClick={() => toggleFavorite(item._id, item.isFavorite)}
+                        className="p-2 bg-white rounded-lg shadow-sm hover:bg-pink-50"
+                      >
+                        <Heart 
+                          size={16} 
+                          className={item.isFavorite ? 'text-red-500 fill-red-500' : 'text-gray-600'} 
+                        />
                       </button>
                       <button 
                         onClick={() => deleteItem(item._id)}
