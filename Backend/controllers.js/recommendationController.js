@@ -33,16 +33,36 @@ const generateOutfitRecommendation = async (userId, occasion, weather, userPrefe
       return [];
     }
 
+    // Determine season based on temperature
+    const getSeason = (temp) => {
+      if (temp < 10) return ['winter', 'fall'];
+      if (temp < 20) return ['fall', 'spring'];
+      if (temp < 28) return ['spring', 'summer'];
+      return ['summer'];
+    };
+
+    const currentSeasons = getSeason(weather.temperature);
+
     // Filter items based on weather and occasion
     let suitableItems = wardrobeItems.filter(item => {
-      const weatherSuitable = weather.temperature > 20 ? 
-        !['jacket', 'sweater'].includes(item.type) : 
-        true;
+      // Weather suitability
+      const seasonMatch = item.season.some(s => currentSeasons.includes(s));
       
+      // Temperature-based type filtering
+      let tempSuitable = true;
+      if (weather.temperature > 25) {
+        // Hot weather - avoid heavy items
+        tempSuitable = !['jacket', 'sweater'].includes(item.type);
+      } else if (weather.temperature < 15) {
+        // Cold weather - prefer warm items
+        if (item.category === 'outerwear') tempSuitable = true;
+      }
+      
+      // Occasion suitability
       const occasionSuitable = item.occasion.includes(occasion) || 
         item.occasion.includes('casual');
       
-      return weatherSuitable && occasionSuitable;
+      return seasonMatch && tempSuitable && occasionSuitable;
     });
 
     // Group items by category
@@ -54,34 +74,71 @@ const generateOutfitRecommendation = async (userId, occasion, weather, userPrefe
       accessories: suitableItems.filter(item => item.category === 'accessories')
     };
 
-    // Generate outfit combinations
+    // Generate 3 outfit combinations
     const outfits = [];
+    const maxOutfits = 3;
     
-    for (let i = 0; i < Math.min(3, itemsByCategory.tops.length); i++) {
-      const top = itemsByCategory.tops[i];
-      const bottom = itemsByCategory.bottoms[Math.floor(Math.random() * itemsByCategory.bottoms.length)];
-      const shoes = itemsByCategory.shoes[Math.floor(Math.random() * itemsByCategory.shoes.length)];
+    // Shuffle arrays for variety
+    const shuffle = (arr) => arr.sort(() => Math.random() - 0.5);
+    shuffle(itemsByCategory.tops);
+    shuffle(itemsByCategory.bottoms);
+    shuffle(itemsByCategory.shoes);
+
+    for (let i = 0; i < maxOutfits; i++) {
+      const top = itemsByCategory.tops[i % itemsByCategory.tops.length];
+      const bottom = itemsByCategory.bottoms[i % itemsByCategory.bottoms.length];
+      const shoes = itemsByCategory.shoes[i % itemsByCategory.shoes.length];
       
       if (top && bottom && shoes) {
-        const outfit = {
-          items: [
-            { itemId: top._id, category: 'tops', name: top.name },
-            { itemId: bottom._id, category: 'bottoms', name: bottom.name },
-            { itemId: shoes._id, category: 'shoes', name: shoes.name }
-          ],
-          occasion,
-          weather,
-          score: Math.round(Math.random() * 30 + 70) // Score between 70-100
-        };
+        const outfitItems = [
+          { 
+            itemId: top._id, 
+            category: 'tops', 
+            name: top.name,
+            color: top.color.primary,
+            imageUrl: top.imageUrl
+          },
+          { 
+            itemId: bottom._id, 
+            category: 'bottoms', 
+            name: bottom.name,
+            color: bottom.color.primary,
+            imageUrl: bottom.imageUrl
+          },
+          { 
+            itemId: shoes._id, 
+            category: 'shoes', 
+            name: shoes.name,
+            color: shoes.color.primary,
+            imageUrl: shoes.imageUrl
+          }
+        ];
 
         // Add outerwear if cold
-        if (weather.temperature < 15 && itemsByCategory.outerwear.length > 0) {
-          outfit.items.push({
-            itemId: itemsByCategory.outerwear[0]._id,
-            category: 'outerwear',
-            name: itemsByCategory.outerwear[0].name
-          });
+        if (weather.temperature < 18 && itemsByCategory.outerwear.length > 0) {
+          const outerwear = itemsByCategory.outerwear[i % itemsByCategory.outerwear.length];
+          if (outerwear) {
+            outfitItems.push({
+              itemId: outerwear._id,
+              category: 'outerwear',
+              name: outerwear.name,
+              color: outerwear.color.primary,
+              imageUrl: outerwear.imageUrl
+            });
+          }
         }
+
+        // Calculate match score based on color coordination and weather
+        const baseScore = 70;
+        const weatherBonus = currentSeasons.some(s => top.season.includes(s)) ? 15 : 0;
+        const occasionBonus = top.occasion.includes(occasion) ? 15 : 0;
+        
+        const outfit = {
+          items: outfitItems,
+          occasion,
+          weather,
+          score: Math.min(100, baseScore + weatherBonus + occasionBonus)
+        };
 
         outfits.push(outfit);
       }
@@ -89,22 +146,40 @@ const generateOutfitRecommendation = async (userId, occasion, weather, userPrefe
 
     return outfits;
   } catch (error) {
+    console.error('Recommendation generation error:', error);
     throw new Error('Failed to generate recommendations');
   }
 };
 
 const recommendOutfit = async (req, res) => {
   try {
+    console.log('\n' + '='.repeat(60));
+    console.log('🎯 [BACKEND] RECOMMENDATION REQUEST RECEIVED');
+    console.log('='.repeat(60));
+    
     const { occasion = 'casual', city } = req.body;
+    console.log('🎯 [BACKEND] Request body:', req.body);
+    console.log('🎯 [BACKEND] User from auth:', req.user ? 'Present' : 'Missing');
+    
+    if (!req.user || !req.user.id) {
+      console.error('❌ [BACKEND] No user ID found!');
+      return res.status(401).json({ message: 'Authentication required', recommendations: [] });
+    }
+    
     const userId = req.user.id;
+    console.log('🎯 [BACKEND] User ID:', userId);
+    console.log('🎯 [BACKEND] Occasion:', occasion);
+    console.log('🎯 [BACKEND] City:', city);
 
     // Get weather data
     const weather = city ? await getWeatherData(city) : { temperature: 22, condition: 'clear' };
+    console.log('🎯 [BACKEND] Weather:', weather);
 
     // Get user preferences
     const userPreferences = req.user.preferences || {};
 
     // Generate recommendations
+    console.log('🎯 [BACKEND] Generating recommendations...');
     const recommendations = await generateOutfitRecommendation(
       userId,
       occasion,
@@ -112,13 +187,17 @@ const recommendOutfit = async (req, res) => {
       userPreferences
     );
 
+    console.log('✅ [BACKEND] Recommendations generated:', recommendations.length);
+    console.log('='.repeat(60) + '\n');
+
     res.json({
       recommendations,
       weather,
       occasion
     });
   } catch (error) {
-    res.status(500).json({ message: 'Failed to generate recommendations', error: error.message });
+    console.error('❌ [BACKEND] Recommendation error:', error);
+    res.status(500).json({ message: 'Failed to generate recommendations', error: error.message, recommendations: [] });
   }
 };
 

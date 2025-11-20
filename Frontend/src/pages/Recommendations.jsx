@@ -5,6 +5,7 @@ import Navbar from '../components/Navbar';
 const Recommendations = () => {
   const [weather, setWeather] = useState(null);
   const [occasion, setOccasion] = useState('casual');
+  const [city, setCity] = useState('Delhi');
   const [recommendations, setRecommendations] = useState([]);
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -16,6 +17,11 @@ const Recommendations = () => {
   const getRecommendations = async () => {
     setLoading(true);
     try {
+      console.log('\n🎯 [RECOMMENDATIONS] Starting request...');
+      console.log('🎯 [RECOMMENDATIONS] Occasion:', occasion);
+      console.log('🎯 [RECOMMENDATIONS] City:', city);
+      console.log('🎯 [RECOMMENDATIONS] Token:', localStorage.getItem('token') ? 'Present' : 'Missing');
+      
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/recommendations/recommend-outfit`, {
         method: 'POST',
         headers: {
@@ -25,23 +31,36 @@ const Recommendations = () => {
         credentials: 'include',
         body: JSON.stringify({
           occasion,
-          city: 'New York'
+          city: city || 'Delhi'
         })
       });
 
+      console.log('🎯 [RECOMMENDATIONS] Response status:', response.status);
+      
       const data = await response.json();
-      console.log('Recommendations response:', data);
+      console.log('🎯 [RECOMMENDATIONS] Response data:', data);
+      
       if (response.ok) {
+        console.log('✅ [RECOMMENDATIONS] Success!');
+        console.log('✅ [RECOMMENDATIONS] Weather:', data.weather);
+        console.log('✅ [RECOMMENDATIONS] Recommendations count:', data.recommendations?.length || 0);
+        
         setWeather(data.weather);
         // Ensure recommendations is always an array
         const recs = Array.isArray(data.recommendations) ? data.recommendations : [];
+        console.log('✅ [RECOMMENDATIONS] Setting recommendations:', recs.length, 'outfits');
         setRecommendations(recs);
+        
+        if (recs.length === 0) {
+          console.warn('⚠️  [RECOMMENDATIONS] No recommendations returned from API!');
+        }
       } else {
-        console.error('Recommendations API error:', data);
+        console.error('❌ [RECOMMENDATIONS] API error:', data);
         setRecommendations([]);
       }
     } catch (error) {
-      console.error('Failed to get recommendations:', error);
+      console.error('❌ [RECOMMENDATIONS] Network error:', error);
+      setRecommendations([]);
     } finally {
       setLoading(false);
     }
@@ -111,18 +130,33 @@ const Recommendations = () => {
             </div>
           </div>
 
-          {/* Occasion Selector */}
+          {/* Occasion & City Selector */}
           <div className="bg-white/80 backdrop-blur-sm rounded-3xl p-6 shadow-lg border border-white/50">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Select Occasion</h3>
-            <select
-              value={occasion}
-              onChange={(e) => setOccasion(e.target.value)}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
-            >
-              {occasions.map(occ => (
-                <option key={occ} value={occ} className="capitalize">{occ}</option>
-              ))}
-            </select>
+            <h3 className="text-lg font-semibold text-gray-900 mb-4">Preferences</h3>
+            <div className="space-y-3">
+              <div>
+                <label className="text-sm text-gray-600 mb-1 block">City</label>
+                <input
+                  type="text"
+                  value={city}
+                  onChange={(e) => setCity(e.target.value)}
+                  placeholder="Enter your city"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                />
+              </div>
+              <div>
+                <label className="text-sm text-gray-600 mb-1 block">Occasion</label>
+                <select
+                  value={occasion}
+                  onChange={(e) => setOccasion(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none"
+                >
+                  {occasions.map(occ => (
+                    <option key={occ} value={occ} className="capitalize">{occ}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -184,30 +218,36 @@ const Recommendations = () => {
                   </div>
                 </div>
 
-                {/* Outfit Visualization */}
-                <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl p-6 mb-4">
-                  <div className="text-center">
-                    <div className="text-4xl mb-2">👕</div>
-                    <p className="text-sm text-gray-600">Outfit Preview</p>
-                  </div>
-                </div>
-
                 {/* Outfit Items */}
-                <div className="space-y-3">
+                <div className="space-y-3 mb-4">
                   {outfit.items?.map((item, itemIndex) => (
-                    <div key={itemIndex} className="flex items-center justify-between py-2 border-b border-gray-100 last:border-b-0">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-8 h-8 bg-gray-200 rounded-lg flex items-center justify-center">
-                          <span className="text-xs">👔</span>
-                        </div>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">
-                            {item.name || item.category}
-                          </p>
-                          <p className="text-xs text-gray-500 capitalize">
-                            {item.category}
-                          </p>
-                        </div>
+                    <div key={itemIndex} className="flex items-center space-x-3 p-3 bg-gray-50 rounded-lg hover:bg-gray-100 transition">
+                      {item.imageUrl ? (
+                        <img 
+                          src={item.imageUrl.startsWith('http') ? item.imageUrl : `http://localhost:5000${item.imageUrl}`}
+                          alt={item.name}
+                          className="w-16 h-16 object-cover rounded-lg"
+                          onError={(e) => {
+                            e.target.style.display = 'none';
+                            e.target.nextSibling.style.display = 'flex';
+                          }}
+                        />
+                      ) : null}
+                      <div className="w-16 h-16 bg-gradient-to-br from-purple-100 to-blue-100 rounded-lg flex items-center justify-center" style={{display: item.imageUrl ? 'none' : 'flex'}}>
+                        <span className="text-2xl">
+                          {item.category === 'tops' ? '👕' : 
+                           item.category === 'bottoms' ? '👖' : 
+                           item.category === 'shoes' ? '👟' : 
+                           item.category === 'outerwear' ? '🧥' : '👔'}
+                        </span>
+                      </div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">
+                          {item.name || item.category}
+                        </p>
+                        <p className="text-xs text-gray-500 capitalize">
+                          {item.category} {item.color ? `• ${item.color}` : ''}
+                        </p>
                       </div>
                     </div>
                   ))}

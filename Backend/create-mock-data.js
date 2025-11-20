@@ -3,7 +3,21 @@ const WardrobeItem = require('./models/WardrobeItem');
 const User = require('./models/User');
 require('dotenv').config();
 
+// ⚠️ WARNING: This file creates DUMMY DATA for testing purposes only
+// ⚠️ DO NOT USE IN PRODUCTION - Use real wardrobe items instead
+
 async function createMockData() {
+  console.log('⚠️  WARNING: This script creates dummy/mock data!');
+  console.log('⚠️  This should only be used for development/testing purposes.');
+  console.log('⚠️  Use remove-dummy-data.js to clean up dummy data.');
+  console.log('');
+  
+  // Prevent accidental execution
+  console.log('❌ Mock data creation is disabled.');
+  console.log('💡 If you really need to create test data, uncomment the code in this file.');
+  return;
+  
+  /* COMMENTED OUT TO PREVENT ACCIDENTAL DUMMY DATA CREATION
   try {
     await mongoose.connect(process.env.MONGODB_URL);
     console.log('Connected to MongoDB');
@@ -106,6 +120,7 @@ async function createMockData() {
   } finally {
     mongoose.disconnect();
   }
+  */
 }
 
 createMockData();

@@ -7,6 +7,7 @@ const Upload = () => {
   const [preview, setPreview] = useState(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [aiResults, setAiResults] = useState(null);
+  const [serverImageUrl, setServerImageUrl] = useState(null);
   const [adding, setAdding] = useState(false);
 
   const handleFileSelect = (e) => {
@@ -39,7 +40,9 @@ const Upload = () => {
 
     try {
       const token = localStorage.getItem('token');
-      console.log('Sending token:', token ? 'Present' : 'Missing');
+      console.log('🔵 [UPLOAD] Starting upload...');
+      console.log('🔵 [UPLOAD] File:', selectedFile.name);
+      console.log('🔵 [UPLOAD] Token:', token ? 'Present' : 'Missing');
       
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/wardrobe/upload-image`, {
         method: 'POST',
@@ -54,16 +57,21 @@ const Upload = () => {
       try {
         data = await response.json();
       } catch (parseError) {
-        console.error('Failed to parse response as JSON:', parseError);
+        console.error('❌ [UPLOAD] Failed to parse response as JSON:', parseError);
         const text = await response.text();
-        console.error('Response text:', text.substring(0, 200));
+        console.error('❌ [UPLOAD] Response text:', text.substring(0, 200));
         throw new Error('Server returned invalid response');
       }
-      console.log('Upload response:', response.status, data);
+      console.log('🔵 [UPLOAD] Response status:', response.status);
+      console.log('🔵 [UPLOAD] Response data:', data);
       
       if (response.ok) {
-        console.log('Analysis successful:', data);
+        console.log('✅ [UPLOAD] Analysis successful!');
+        console.log('✅ [UPLOAD] Detection:', data.detection);
+        console.log('✅ [UPLOAD] Server Image URL:', data.imageUrl);
         setAiResults(data.detection);
+        setServerImageUrl(data.imageUrl);
+        console.log('✅ [UPLOAD] State updated. Now click "Add to Wardrobe" button!');
       } else {
         console.error('Analysis failed:', data);
         console.error('Response status:', response.status);
@@ -83,11 +91,30 @@ const Upload = () => {
   };
 
   const addToWardrobe = async () => {
-    if (!aiResults) return;
+    if (!aiResults) {
+      console.error('❌ [ADD] No AI results available!');
+      return;
+    }
+
+    if (!serverImageUrl) {
+      console.error('❌ [ADD] No server image URL available!');
+      alert('Error: Image URL missing. Please upload again.');
+      return;
+    }
 
     setAdding(true);
     try {
-      console.log('Adding to wardrobe:', aiResults);
+      const itemData = {
+        name: `${aiResults.color.primary} ${aiResults.type}`,
+        type: aiResults.type,
+        category: aiResults.category,
+        color: aiResults.color,
+        fabric: aiResults.fabric,
+        imageUrl: serverImageUrl
+      };
+
+      console.log('🟢 [ADD] Adding to wardrobe...');
+      console.log('🟢 [ADD] Item data:', itemData);
       
       const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/wardrobe/add-to-wardrobe`, {
         method: 'POST',
@@ -95,30 +122,29 @@ const Upload = () => {
           'Content-Type': 'application/json'
         },
         credentials: 'include',
-        body: JSON.stringify({
-          name: `${aiResults.color.primary} ${aiResults.type}`,
-          type: aiResults.type,
-          category: aiResults.category,
-          color: aiResults.color,
-          fabric: aiResults.fabric,
-          imageUrl: preview
-        })
+        body: JSON.stringify(itemData)
       });
 
       const data = await response.json();
-      console.log('Add to wardrobe response:', data);
+      console.log('🟢 [ADD] Response status:', response.status);
+      console.log('🟢 [ADD] Response data:', data);
 
       if (response.ok) {
-        alert('Item added to wardrobe successfully!');
+        console.log('✅ [ADD] Item added successfully!');
+        console.log('✅ [ADD] Item ID:', data.item?._id);
+        console.log('✅ [ADD] Item category:', data.item?.category);
+        alert('✅ Item added to wardrobe successfully! Check "Your Wardrobe" page.');
         // Reset form
         setSelectedFile(null);
         setPreview(null);
         setAiResults(null);
+        setServerImageUrl(null);
       } else {
+        console.error('❌ [ADD] Failed:', data.message);
         alert(`Failed to add item: ${data.message}`);
       }
     } catch (error) {
-      console.error('Add to wardrobe error:', error);
+      console.error('❌ [ADD] Network error:', error);
       alert('Network error. Please try again.');
     } finally {
       setAdding(false);
@@ -133,6 +159,13 @@ const Upload = () => {
         <div className="mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Upload & Scan</h1>
           <p className="text-gray-600">Upload a photo of your clothing item for AI analysis</p>
+          <div className="mt-4 bg-blue-50 border border-blue-200 rounded-lg p-4">
+            <p className="text-sm text-blue-800">
+              <strong>💡 Pro Tip:</strong> For better detection, name your files descriptively!
+              <br />
+              <span className="text-blue-600">Examples: "blue-jeans.jpg", "red-shirt.png", "black-shoes.jpg"</span>
+            </p>
+          </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -156,6 +189,7 @@ const Upload = () => {
                       setSelectedFile(null);
                       setPreview(null);
                       setAiResults(null);
+                      setServerImageUrl(null);
                     }}
                     className="text-sm text-gray-500 hover:text-gray-700"
                   >
@@ -223,37 +257,87 @@ const Upload = () => {
             {aiResults && (
               <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
                 <h3 className="text-lg font-semibold text-gray-900 mb-4">AI Analysis Results</h3>
+                <p className="text-sm text-gray-500 mb-4">Review and edit if needed</p>
                 
                 <div className="space-y-4">
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Type:</span>
-                    <span className="font-medium capitalize">{aiResults.type}</span>
+                  <div>
+                    <label className="text-sm text-gray-600 block mb-1">Type:</label>
+                    <select
+                      value={aiResults.type}
+                      onChange={(e) => setAiResults({...aiResults, type: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none capitalize"
+                    >
+                      <option value="shirt">Shirt</option>
+                      <option value="t-shirt">T-Shirt</option>
+                      <option value="jeans">Jeans</option>
+                      <option value="pants">Pants</option>
+                      <option value="shorts">Shorts</option>
+                      <option value="dress">Dress</option>
+                      <option value="skirt">Skirt</option>
+                      <option value="jacket">Jacket</option>
+                      <option value="sweater">Sweater</option>
+                      <option value="shoes">Shoes</option>
+                    </select>
                   </div>
                   
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Category:</span>
-                    <span className="font-medium capitalize">{aiResults.category}</span>
+                  <div>
+                    <label className="text-sm text-gray-600 block mb-1">Category:</label>
+                    <select
+                      value={aiResults.category}
+                      onChange={(e) => setAiResults({...aiResults, category: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none capitalize"
+                    >
+                      <option value="tops">Tops</option>
+                      <option value="bottoms">Bottoms</option>
+                      <option value="dresses">Dresses</option>
+                      <option value="outerwear">Outerwear</option>
+                      <option value="shoes">Shoes</option>
+                      <option value="accessories">Accessories</option>
+                    </select>
                   </div>
                   
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Primary Color:</span>
-                    <div className="flex items-center space-x-2">
-                      <div 
-                        className="w-4 h-4 rounded-full border border-gray-300"
-                        style={{ backgroundColor: aiResults.color.primary }}
-                      ></div>
-                      <span className="font-medium capitalize">{aiResults.color.primary}</span>
-                    </div>
+                  <div>
+                    <label className="text-sm text-gray-600 block mb-1">Primary Color:</label>
+                    <select
+                      value={aiResults.color.primary}
+                      onChange={(e) => setAiResults({...aiResults, color: {...aiResults.color, primary: e.target.value}})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none capitalize"
+                    >
+                      <option value="black">Black</option>
+                      <option value="white">White</option>
+                      <option value="blue">Blue</option>
+                      <option value="red">Red</option>
+                      <option value="green">Green</option>
+                      <option value="yellow">Yellow</option>
+                      <option value="gray">Gray</option>
+                      <option value="brown">Brown</option>
+                      <option value="pink">Pink</option>
+                      <option value="purple">Purple</option>
+                      <option value="orange">Orange</option>
+                    </select>
                   </div>
                   
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Fabric:</span>
-                    <span className="font-medium capitalize">{aiResults.fabric}</span>
+                  <div>
+                    <label className="text-sm text-gray-600 block mb-1">Fabric:</label>
+                    <select
+                      value={aiResults.fabric}
+                      onChange={(e) => setAiResults({...aiResults, fabric: e.target.value})}
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 outline-none capitalize"
+                    >
+                      <option value="cotton">Cotton</option>
+                      <option value="denim">Denim</option>
+                      <option value="silk">Silk</option>
+                      <option value="wool">Wool</option>
+                      <option value="polyester">Polyester</option>
+                      <option value="linen">Linen</option>
+                      <option value="leather">Leather</option>
+                      <option value="synthetic">Synthetic</option>
+                    </select>
                   </div>
                   
-                  <div className="flex justify-between items-center">
-                    <span className="text-gray-600">Confidence:</span>
-                    <span className="font-medium">{Math.round(aiResults.confidence * 100)}%</span>
+                  <div className="flex justify-between items-center pt-2 border-t">
+                    <span className="text-sm text-gray-600">AI Confidence:</span>
+                    <span className="text-sm font-medium">{Math.round(aiResults.confidence * 100)}%</span>
                   </div>
                 </div>
 
