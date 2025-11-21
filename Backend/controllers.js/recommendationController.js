@@ -190,6 +190,18 @@ const recommendOutfit = async (req, res) => {
     console.log('✅ [BACKEND] Recommendations generated:', recommendations.length);
     console.log('='.repeat(60) + '\n');
 
+    // Create notification if recommendations generated
+    if (recommendations.length > 0) {
+      const { createNotification } = require('./notificationController');
+      await createNotification(
+        userId,
+        'outfit_suggested',
+        'New Outfit Suggestions',
+        `${recommendations.length} outfit suggestions are ready for ${occasion}`,
+        {}
+      );
+    }
+
     res.json({
       recommendations,
       weather,

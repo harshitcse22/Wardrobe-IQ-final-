@@ -88,6 +88,20 @@ const addToWardrobe = async (req, res) => {
     const wardrobeItem = new WardrobeItem(itemData);
     await wardrobeItem.save();
 
+    // Create notification
+    const { createNotification } = require('./notificationController');
+    await createNotification(
+      req.user.id,
+      'cloth_added',
+      'New Item Added',
+      `${wardrobeItem.name || wardrobeItem.type} has been added to your wardrobe`,
+      {
+        itemId: wardrobeItem._id,
+        itemName: wardrobeItem.name || wardrobeItem.type,
+        imageUrl: wardrobeItem.imageUrl
+      }
+    );
+
     res.status(201).json({
       message: 'Item added to wardrobe',
       item: wardrobeItem
@@ -158,6 +172,18 @@ const deleteWardrobeItem = async (req, res) => {
     if (!item) {
       return res.status(404).json({ message: 'Item not found' });
     }
+
+    // Create notification
+    const { createNotification } = require('./notificationController');
+    await createNotification(
+      req.user.id,
+      'cloth_removed',
+      'Item Removed',
+      `${item.name || item.type} has been removed from your wardrobe`,
+      {
+        itemName: item.name || item.type
+      }
+    );
 
     res.json({ message: 'Item deleted successfully' });
   } catch (error) {

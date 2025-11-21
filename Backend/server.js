@@ -9,6 +9,7 @@ const authRoutes = require('./routes.js/authRoutes');
 const wardrobeRoutes = require('./routes.js/wardrobeRoutes');
 const recommendationRoutes = require('./routes.js/recommendationRoutes');
 const tripRoutes = require('./routes.js/tripRoutes');
+const notificationRoutes = require('./routes.js/notificationRoutes');
 const upload = require('./simple-upload');
 
 dotenv.config();
@@ -51,10 +52,30 @@ app.use('/api/auth', authRoutes);
 app.use('/api/wardrobe', wardrobeRoutes);
 app.use('/api/recommendations', recommendationRoutes);
 app.use('/api/trips', tripRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check
 app.get('/api/health', (req, res) => {
   res.json({ message: 'WardrobeIQ Backend is running!' });
+});
+
+// Debug endpoint for notifications
+app.get('/api/debug/notifications', async (req, res) => {
+  try {
+    const Notification = require('./models/Notification');
+    const userId = '691f139f867e7df5eba42b30';
+    const notifications = await Notification.find({ userId }).limit(10).sort({ createdAt: -1 });
+    const unreadCount = await Notification.countDocuments({ userId, read: false });
+    res.json({
+      success: true,
+      userId,
+      totalNotifications: notifications.length,
+      unreadCount,
+      notifications
+    });
+  } catch (error) {
+    res.status(500).json({ error: error.message });
+  }
 });
 
 // Simple test endpoint

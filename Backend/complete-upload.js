@@ -184,6 +184,21 @@ const addToWardrobe = async (req, res) => {
       occasion: wardrobeItem.occasion,
       imageUrl: wardrobeItem.imageUrl
     });
+
+    // Create notification
+    const { createNotification } = require('./controllers.js/notificationController');
+    await createNotification(
+      userId,
+      'cloth_added',
+      'New Item Added! 🛍️',
+      `${wardrobeItem.name} has been added to your wardrobe`,
+      {
+        itemId: wardrobeItem._id,
+        itemName: wardrobeItem.name,
+        imageUrl: wardrobeItem.imageUrl
+      }
+    );
+    console.log('✅ [BACKEND] Notification created!');
     console.log('='.repeat(60) + '\n');
 
     res.status(201).json({

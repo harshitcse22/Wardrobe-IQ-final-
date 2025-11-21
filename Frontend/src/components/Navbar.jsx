@@ -1,9 +1,12 @@
 import { User, LogOut, Bell, Search } from 'lucide-react';
 import { useState, useEffect } from 'react';
 import WeatherIcon from './WeatherIcon';
+import NotificationPanel from './NotificationPanel';
 
 const Navbar = ({ user }) => {
   const [weather, setWeather] = useState(null);
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
 
   useEffect(() => {
     // Fetch weather data
@@ -18,7 +21,44 @@ const Navbar = ({ user }) => {
     .then(res => res.json())
     .then(data => setWeather(data.weather))
     .catch(() => setWeather({ temperature: 22, condition: 'clear' }));
+
+    // Fetch unread notifications count
+    fetchUnreadCount();
+    
+    // Poll for new notifications every 15 seconds
+    const interval = setInterval(fetchUnreadCount, 15000);
+    return () => clearInterval(interval);
   }, []);
+
+  const fetchUnreadCount = async () => {
+    try {
+      console.log('🔔 [Navbar] Fetching unread count...');
+      const token = localStorage.getItem('token');
+      console.log('🔔 [Navbar] Token exists:', !!token);
+      
+      const response = await fetch(`${import.meta.env.VITE_API_URL || 'http://localhost:5000'}/api/notifications`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        credentials: 'include'
+      });
+      
+      console.log('🔔 [Navbar] Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('🔔 [Navbar] Error:', errorData);
+        return;
+      }
+      
+      const data = await response.json();
+      console.log('🔔 [Navbar] Unread count:', data.unreadCount);
+      setUnreadCount(data.unreadCount || 0);
+    } catch (error) {
+      console.error('🔔 [Navbar] Failed to fetch unread count:', error);
+    }
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('token');
@@ -26,6 +66,7 @@ const Navbar = ({ user }) => {
   };
 
   return (
+    <>
     <nav className="bg-white/80 backdrop-blur-lg border-b border-white/20 px-6 py-4 sticky top-0 z-50">
       <div className="flex items-center justify-between">
         {/* Logo */}
@@ -56,9 +97,14 @@ const Navbar = ({ user }) => {
           </button>
 
           {/* Notifications */}
-          <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all duration-200 relative">
+          <button 
+            onClick={() => setShowNotifications(true)}
+            className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-xl transition-all duration-200 relative"
+          >
             <Bell size={20} />
-            <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
+            {unreadCount > 0 && (
+              <div className="absolute top-1 right-1 w-2 h-2 bg-red-500 rounded-full"></div>
+            )}
           </button>
 
           {/* Profile Section */}
@@ -85,6 +131,15 @@ const Navbar = ({ user }) => {
         </div>
       </div>
     </nav>
+    
+    <NotificationPanel 
+      isOpen={showNotifications} 
+      onClose={() => {
+        setShowNotifications(false);
+        fetchUnreadCount();
+      }} 
+    />
+    </>
   );
 };
 

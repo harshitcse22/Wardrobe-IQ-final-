@@ -130,6 +130,19 @@ const createTripPlan = async (req, res) => {
 
     await tripPlan.save();
 
+    // Create notification
+    const { createNotification } = require('./notificationController');
+    await createNotification(
+      userId,
+      'trip_planned',
+      'Trip Planned',
+      `Your trip to ${destination} has been planned successfully`,
+      {
+        tripId: tripPlan._id,
+        destination
+      }
+    );
+
     res.status(201).json({
       message: 'Trip plan created successfully',
       tripPlan
